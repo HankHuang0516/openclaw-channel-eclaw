@@ -17,7 +17,11 @@ import { createWebhookHandler } from './webhook-handler.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function startAccount(ctx: any): Promise<void> {
   const { accountId, config } = ctx;
+  console.log(`[E-Claw] startAccount called, accountId=${accountId}, config keys=${Object.keys(config || {}).join(',')}`);
+  console.log(`[E-Claw] config.channels.eclaw=`, JSON.stringify(config?.channels?.eclaw ?? null));
+  console.log(`[E-Claw] config.accounts=`, JSON.stringify(config?.accounts ?? null));
   const account = resolveAccount(config, accountId);
+  console.log(`[E-Claw] resolved account: enabled=${account.enabled}, apiKey=${account.apiKey ? 'SET' : 'MISSING'}`);
 
   if (!account.enabled || !account.apiKey) {
     console.log(`[E-Claw] Account ${accountId} disabled or missing credentials, skipping`);
