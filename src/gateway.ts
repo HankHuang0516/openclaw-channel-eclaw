@@ -1,9 +1,23 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { resolveAccount } from './config.js';
 import { EClawClient } from './client.js';
 import { setClient } from './outbound.js';
 import { createWebhookHandler } from './webhook-handler.js';
+
+/** Read full openclaw.json config from disk */
+function readFullConfig(): unknown {
+  const configPath = process.env.OPENCLAW_CONFIG_PATH
+    || join(homedir(), '.openclaw', 'openclaw.json');
+  try {
+    return JSON.parse(readFileSync(configPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Gateway lifecycle: start an E-Claw account.
@@ -16,12 +30,10 @@ import { createWebhookHandler } from './webhook-handler.js';
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function startAccount(ctx: any): Promise<void> {
-  const { accountId, config } = ctx;
-  console.log(`[E-Claw] startAccount called, accountId=${accountId}, config keys=${Object.keys(config || {}).join(',')}`);
-  console.log(`[E-Claw] config.channels.eclaw=`, JSON.stringify(config?.channels?.eclaw ?? null));
-  console.log(`[E-Claw] config.accounts=`, JSON.stringify(config?.accounts ?? null));
-  const account = resolveAccount(config, accountId);
-  console.log(`[E-Claw] resolved account: enabled=${account.enabled}, apiKey=${account.apiKey ? 'SET' : 'MISSING'}`);
+  const { accountId } = ctx;
+  // OpenClaw passes an empty config object to the gateway — read config from disk directly
+  const fullConfig = readFullConfig();
+  const account = resolveAccount(fullConfig, accountId);
 
   if (!account.enabled || !account.apiKey) {
     console.log(`[E-Claw] Account ${accountId} disabled or missing credentials, skipping`);
