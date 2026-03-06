@@ -6,6 +6,7 @@ export interface EClawAccountConfig {
   apiBase: string;
   entityId: number;
   botName?: string;
+  webhookUrl?: string;
 }
 
 /** Inbound message from E-Claw callback webhook */

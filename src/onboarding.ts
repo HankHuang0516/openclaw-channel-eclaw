@@ -59,6 +59,12 @@ export const eclawOnboardingAdapter = {
       initialValue: resolved.botName ?? '',
     });
 
+    const webhookUrl = await prompter.text({
+      message: 'Webhook URL (your OpenClaw public URL, e.g. https://openclaw.example.com)',
+      placeholder: 'https://your-openclaw-domain.com',
+      initialValue: resolved.webhookUrl ?? '',
+    });
+
     const nextCfg = {
       ...cfg,
       channels: {
@@ -72,6 +78,7 @@ export const eclawOnboardingAdapter = {
               apiBase: resolved.apiBase || 'https://eclawbot.com',
               entityId: Number(entityIdStr),
               botName: String(botName).trim() || undefined,
+              webhookUrl: String(webhookUrl).trim() || undefined,
               enabled: true,
             },
           },

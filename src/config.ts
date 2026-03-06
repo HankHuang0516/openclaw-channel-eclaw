@@ -32,5 +32,6 @@ export function resolveAccount(cfg: any, accountId?: string): EClawAccountConfig
     apiBase: (account?.apiBase ?? 'https://eclawbot.com').replace(/\/$/, ''),
     entityId: account?.entityId ?? 0,
     botName: account?.botName,
+    webhookUrl: account?.webhookUrl,
   };
 }
