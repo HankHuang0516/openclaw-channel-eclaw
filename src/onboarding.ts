@@ -1,6 +1,6 @@
 import { listAccountIds, resolveAccount } from './config.js';
 
-const DEFAULT_ACCOUNT_ID = 'main';
+const DEFAULT_ACCOUNT_ID = 'default';
 
 export const eclawOnboardingAdapter = {
   channel: 'eclaw',
