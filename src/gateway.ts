@@ -19,7 +19,7 @@ export async function startAccount(ctx: any): Promise<void> {
   const { accountId, config } = ctx;
   const account = resolveAccount(config, accountId);
 
-  if (!account.enabled || !account.apiKey || !account.apiSecret) {
+  if (!account.enabled || !account.apiKey) {
     console.log(`[E-Claw] Account ${accountId} disabled or missing credentials, skipping`);
     return;
   }
