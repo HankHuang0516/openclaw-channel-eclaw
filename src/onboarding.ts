@@ -10,7 +10,7 @@ export const eclawOnboardingAdapter = {
     const ids = listAccountIds(cfg);
     const configured = ids.some((id: string) => {
       const acc = resolveAccount(cfg, id);
-      return Boolean(acc.apiKey && acc.apiSecret);
+      return Boolean(acc.apiKey);
     });
     return {
       channel: 'eclaw',
@@ -30,7 +30,7 @@ export const eclawOnboardingAdapter = {
       [
         '1. Log in to https://eclawbot.com',
         '2. Go to Portal → Settings → Channel API',
-        '3. Create an API Key and API Secret',
+        '3. Create an API Key',
         '4. Enter the credentials below',
       ].join('\n'),
       'E-Claw Setup',
@@ -40,13 +40,6 @@ export const eclawOnboardingAdapter = {
       message: 'Channel API Key',
       placeholder: 'eck_...',
       initialValue: resolved.apiKey || '',
-      validate: (v: string) => (String(v ?? '').trim() ? undefined : 'Required'),
-    });
-
-    const apiSecret = await prompter.text({
-      message: 'Channel API Secret',
-      placeholder: 'ecs_...',
-      initialValue: resolved.apiSecret || '',
       validate: (v: string) => (String(v ?? '').trim() ? undefined : 'Required'),
     });
 
@@ -76,7 +69,6 @@ export const eclawOnboardingAdapter = {
             ...((cfg.channels?.eclaw as any)?.accounts ?? {}),  // eslint-disable-line @typescript-eslint/no-explicit-any
             [accountId]: {
               apiKey: String(apiKey).trim(),
-              apiSecret: String(apiSecret).trim(),
               apiBase: resolved.apiBase || 'https://eclawbot.com',
               entityId: Number(entityIdStr),
               botName: String(botName).trim() || undefined,

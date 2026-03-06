@@ -18,7 +18,7 @@ export function resolveAccount(cfg: any, accountId?: string): EClawAccountConfig
   return {
     enabled: account?.enabled ?? true,
     apiKey: account?.apiKey ?? '',
-    apiSecret: account?.apiSecret ?? '',
+    apiSecret: account?.apiSecret,
     apiBase: (account?.apiBase ?? 'https://eclawbot.com').replace(/\/$/, ''),
     entityId: account?.entityId ?? 0,
     botName: account?.botName,

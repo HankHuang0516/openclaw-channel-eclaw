@@ -12,7 +12,7 @@ import type {
 export class EClawClient {
   private readonly apiBase: string;
   private readonly apiKey: string;
-  private readonly apiSecret: string;
+
   private deviceId: string | null = null;
   private botSecret: string | null = null;
   private entityId: number;
@@ -20,7 +20,6 @@ export class EClawClient {
   constructor(config: EClawAccountConfig) {
     this.apiBase = config.apiBase;
     this.apiKey = config.apiKey;
-    this.apiSecret = config.apiSecret;
     this.entityId = config.entityId;
   }
 
@@ -31,7 +30,6 @@ export class EClawClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         channel_api_key: this.apiKey,
-        channel_api_secret: this.apiSecret,
         callback_url: callbackUrl,
         callback_token: callbackToken,
       }),
@@ -53,7 +51,6 @@ export class EClawClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         channel_api_key: this.apiKey,
-        channel_api_secret: this.apiSecret,
         entityId,
         name: name || undefined,
       }),
@@ -106,7 +103,6 @@ export class EClawClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         channel_api_key: this.apiKey,
-        channel_api_secret: this.apiSecret,
       }),
     });
   }

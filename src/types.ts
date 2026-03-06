@@ -2,7 +2,7 @@
 export interface EClawAccountConfig {
   enabled: boolean;
   apiKey: string;
-  apiSecret: string;
+  apiSecret?: string;
   apiBase: string;
   entityId: number;
   botName?: string;
