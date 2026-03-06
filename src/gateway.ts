@@ -1,4 +1,3 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,6 +7,7 @@ import type { EClawAccountConfig } from './types.js';
 import { EClawClient } from './client.js';
 import { setClient } from './outbound.js';
 import { createWebhookHandler } from './webhook-handler.js';
+import { registerWebhookToken, unregisterWebhookToken } from './webhook-registry.js';
 
 /**
  * Resolve account from ctx.
@@ -15,6 +15,7 @@ import { createWebhookHandler } from './webhook-handler.js';
  * OpenClaw may pass a pre-resolved account object in ctx.account,
  * or an empty config. Fall back to reading openclaw.json from disk.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveAccountFromCtx(ctx: any): EClawAccountConfig {
   // Preferred: OpenClaw passes the resolved account in ctx.account
   if (ctx.account?.apiKey) {
@@ -43,7 +44,8 @@ function resolveAccountFromCtx(ctx: any): EClawAccountConfig {
  * Gateway lifecycle: start an E-Claw account.
  *
  * 1. Resolve credentials from ctx.account or disk
- * 2. Start a local HTTP server to receive webhook callbacks
+ * 2. Register a per-session handler in the webhook-registry (served by the
+ *    main OpenClaw gateway HTTP server at /eclaw-webhook — no separate port)
  * 3. Register callback URL with E-Claw backend
  * 4. Auto-bind entity if not already bound
  * 5. Keep the promise alive until abort signal fires
@@ -66,7 +68,6 @@ export async function startAccount(ctx: any): Promise<void> {
   const callbackToken = randomBytes(32).toString('hex');
 
   // Webhook URL: account config > env var > warn
-  const webhookPort = parseInt(process.env.ECLAW_WEBHOOK_PORT || '0') || 0;
   const publicUrl = account.webhookUrl?.replace(/\/$/, '')
     || process.env.ECLAW_WEBHOOK_URL?.replace(/\/$/, '');
 
@@ -79,76 +80,51 @@ export async function startAccount(ctx: any): Promise<void> {
     );
   }
 
-  // Create webhook handler
+  // The callback URL points to /eclaw-webhook on the main gateway HTTP server
+  const callbackUrl = `${publicUrl || 'http://localhost'}/eclaw-webhook`;
+
+  // Register handler in the per-token registry
   const handler = createWebhookHandler(callbackToken, accountId);
+  registerWebhookToken(callbackToken, accountId, handler);
+  console.log(`[E-Claw] Webhook registered at: ${callbackUrl}`);
 
-  // Parse JSON body for incoming requests
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestHandler = (req: IncomingMessage, res: ServerResponse & { end: any }) => {
-    if (req.method === 'POST' && req.url?.startsWith('/eclaw-webhook')) {
-      let body = '';
-      req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
-      req.on('end', () => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (req as any).body = JSON.parse(body);
-        } catch {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (req as any).body = {};
-        }
-        handler(req, res);
-      });
+  try {
+    // Register callback with E-Claw backend
+    const regData = await client.registerCallback(callbackUrl, callbackToken);
+    console.log(`[E-Claw] Registered with E-Claw. Device: ${regData.deviceId}, Entities: ${regData.entities.length}`);
+
+    // Auto-bind entity if not already bound
+    const entity = regData.entities.find(e => e.entityId === account.entityId);
+    if (!entity?.isBound) {
+      console.log(`[E-Claw] Entity ${account.entityId} not bound, binding...`);
+      const bindData = await client.bindEntity(account.entityId, account.botName);
+      console.log(`[E-Claw] Bound entity ${account.entityId}, publicCode: ${bindData.publicCode}`);
     } else {
-      res.writeHead(404);
-      res.end('Not Found');
+      console.log(`[E-Claw] Entity ${account.entityId} already bound`);
+      const bindData = await client.bindEntity(account.entityId, account.botName);
+      console.log(`[E-Claw] Retrieved credentials for entity ${account.entityId}`);
+      void bindData;
     }
-  };
 
-  const server = createServer(requestHandler);
+    console.log(`[E-Claw] Account ${accountId} ready!`);
+  } catch (err) {
+    console.error(`[E-Claw] Setup failed for account ${accountId}:`, err);
+    unregisterWebhookToken(callbackToken);
+    return;
+  }
 
+  // Keep the promise alive until abort signal fires
   return new Promise<void>((resolve) => {
-    server.listen(webhookPort, async () => {
-      const addr = server.address();
-      const actualPort = typeof addr === 'object' && addr ? addr.port : webhookPort;
-      const baseUrl = publicUrl || `http://localhost:${actualPort}`;
-      const callbackUrl = `${baseUrl}/eclaw-webhook`;
-
-      console.log(`[E-Claw] Webhook server listening on port ${actualPort}`);
-      console.log(`[E-Claw] Callback URL: ${callbackUrl}`);
-
-      try {
-        // Register callback with E-Claw backend
-        const regData = await client.registerCallback(callbackUrl, callbackToken);
-        console.log(`[E-Claw] Registered with E-Claw. Device: ${regData.deviceId}, Entities: ${regData.entities.length}`);
-
-        // Auto-bind entity if not already bound
-        const entity = regData.entities.find(e => e.entityId === account.entityId);
-        if (!entity?.isBound) {
-          console.log(`[E-Claw] Entity ${account.entityId} not bound, binding...`);
-          const bindData = await client.bindEntity(account.entityId, account.botName);
-          console.log(`[E-Claw] Bound entity ${account.entityId}, publicCode: ${bindData.publicCode}`);
-        } else {
-          console.log(`[E-Claw] Entity ${account.entityId} already bound`);
-          const bindData = await client.bindEntity(account.entityId, account.botName);
-          console.log(`[E-Claw] Retrieved credentials for entity ${account.entityId}`);
-          void bindData;
-        }
-
-        console.log(`[E-Claw] Account ${accountId} ready!`);
-      } catch (err) {
-        console.error(`[E-Claw] Setup failed for account ${accountId}:`, err);
-      }
-    });
-
-    // Cleanup on abort
     const signal: AbortSignal | undefined = ctx.abortSignal;
     if (signal) {
       signal.addEventListener('abort', () => {
         console.log(`[E-Claw] Shutting down account ${accountId}`);
         client.unregisterCallback().catch(() => {});
-        server.close();
+        unregisterWebhookToken(callbackToken);
         resolve();
       });
+    } else {
+      resolve();
     }
   });
 }
