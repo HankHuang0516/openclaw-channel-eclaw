@@ -43,7 +43,7 @@ function parseBody(req: any): Promise<void> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const plugin = {
-  id: 'eclaw',
+  id: 'openclaw-channel',
   name: 'E-Claw',
   description: 'E-Claw AI chat platform channel plugin',
 
