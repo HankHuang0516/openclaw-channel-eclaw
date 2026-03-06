@@ -1,6 +1,7 @@
 import { listAccountIds, resolveAccount } from './config.js';
 import { sendText, sendMedia } from './outbound.js';
 import { startAccount } from './gateway.js';
+import { eclawOnboardingAdapter } from './onboarding.js';
 
 /**
  * E-Claw ChannelPlugin definition.
@@ -46,4 +47,6 @@ export const eclawChannel = {
   gateway: {
     startAccount,
   },
+
+  onboarding: eclawOnboardingAdapter,
 };
