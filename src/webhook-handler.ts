@@ -1,15 +1,21 @@
 import type { EClawInboundMessage } from './types.js';
 import { getPluginRuntime } from './runtime.js';
+import { getClient } from './outbound.js';
 
 /**
  * Create an HTTP request handler for inbound messages from E-Claw.
  *
  * When a user sends a message on E-Claw, the backend POSTs structured JSON
- * to this webhook. We normalize it and dispatch to the OpenClaw agent.
+ * to this webhook. We normalize it into OpenClaw's native PascalCase context
+ * format and dispatch to the agent via dispatchReplyWithBufferedBlockDispatcher.
+ *
+ * The `deliver` callback sends the AI reply back to E-Claw via the API client.
  */
 export function createWebhookHandler(
   expectedToken: string,
-  accountId: string
+  accountId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  cfg: any    // full openclaw config (ctx.cfg from startAccount)
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (req: any, res: any): Promise<void> => {
@@ -30,39 +36,64 @@ export function createWebhookHandler(
     // Dispatch to OpenClaw agent
     try {
       const rt = getPluginRuntime();
+      const client = getClient(accountId);
       const conversationId = msg.conversationId || `${msg.deviceId}:${msg.entityId}`;
 
-      // Map E-Claw media types to OpenClaw types
-      let media: { type: string; url: string } | undefined;
-      if (msg.mediaType && msg.mediaUrl) {
-        const type = msg.mediaType === 'photo' ? 'image'
-          : msg.mediaType === 'voice' ? 'audio'
-          : msg.mediaType === 'video' ? 'video'
-          : 'file';
-        media = { type, url: msg.mediaUrl };
-      }
+      // Map E-Claw media type to OpenClaw media type
+      const ocMediaType = msg.mediaType === 'photo' ? 'image'
+        : msg.mediaType === 'voice' ? 'audio'
+        : msg.mediaType === 'video' ? 'video'
+        : msg.mediaType ? 'file'
+        : undefined;
 
-      const inboundCtx = {
-        channelId: 'eclaw',
-        accountId,
-        conversationId,
-        senderId: msg.from,
-        text: msg.text || '',
-        ...(media ? { media } : {}),
-        metadata: {
-          deviceId: msg.deviceId,
-          entityId: msg.entityId,
-          event: msg.event,
-          fromEntityId: msg.fromEntityId,
-          fromCharacter: msg.fromCharacter,
-          isBroadcast: msg.isBroadcast,
-          timestamp: msg.timestamp,
-        },
+      // Build context in OpenClaw's native PascalCase format
+      // (same convention as Telegram/LINE/WhatsApp channels)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inboundCtx: any = {
+        Surface: 'eclaw',
+        Provider: 'eclaw',
+        OriginatingChannel: 'eclaw',
+        AccountId: accountId,
+        From: msg.from,
+        To: conversationId,
+        OriginatingTo: msg.from,
+        SessionKey: conversationId,
+        Body: msg.text || '',
+        RawBody: msg.text || '',
+        CommandBody: msg.text || '',
+        ChatType: 'direct',
+        ...(ocMediaType && msg.mediaUrl ? {
+          MediaType: ocMediaType,
+          MediaUrl: msg.mediaUrl,
+        } : {}),
       };
 
-      // OpenClaw inbound dispatch pipeline
-      const ctx = await rt.channel.reply.finalizeInboundContext(inboundCtx);
-      await rt.channel.reply.dispatchReplyWithBufferedBlockDispatcher(ctx);
+      const ctxPayload = rt.channel.reply.finalizeInboundContext(inboundCtx);
+
+      await rt.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+        ctx: ctxPayload,
+        cfg,
+        dispatcherOptions: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          deliver: async (payload: any) => {
+            if (!client) return;
+            const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+            if (text) {
+              await client.sendMessage(text, 'IDLE');
+            } else if (payload.mediaUrl) {
+              const rawType = typeof payload.mediaType === 'string' ? payload.mediaType : '';
+              const mediaType = rawType === 'image' ? 'photo'
+                : rawType === 'audio' ? 'voice'
+                : rawType === 'video' ? 'video'
+                : 'file';
+              await client.sendMessage('', 'IDLE', mediaType, payload.mediaUrl);
+            }
+          },
+          onError: (err: unknown) => {
+            console.error('[E-Claw] Reply delivery error:', err);
+          },
+        },
+      });
     } catch (err) {
       console.error('[E-Claw] Webhook dispatch error:', err);
     }

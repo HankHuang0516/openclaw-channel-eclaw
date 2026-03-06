@@ -84,7 +84,8 @@ export async function startAccount(ctx: any): Promise<void> {
   const callbackUrl = `${publicUrl || 'http://localhost'}/eclaw-webhook`;
 
   // Register handler in the per-token registry
-  const handler = createWebhookHandler(callbackToken, accountId);
+  // Pass ctx.cfg so the handler can dispatch to the correct OpenClaw agent
+  const handler = createWebhookHandler(callbackToken, accountId, ctx.cfg);
   registerWebhookToken(callbackToken, accountId, handler);
   console.log(`[E-Claw] Webhook registered at: ${callbackUrl}`);
 
