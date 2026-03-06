@@ -15,7 +15,7 @@ export const eclawOnboardingAdapter = {
     return {
       channel: 'eclaw',
       configured,
-      statusLines: [`E-Claw: ${configured ? 'configured ✓' : 'not configured'}`],
+      statusLines: [`E-Claw: ${configured ? 'configured' : 'not configured'}`],
       selectionHint: configured ? 'configured' : 'E-Claw (AI Live Wallpaper Chat)',
       quickstartScore: configured ? 1 : 3,
     };
@@ -28,25 +28,26 @@ export const eclawOnboardingAdapter = {
 
     await prompter.note(
       [
-        '前往 https://eclawbot.com 登入',
-        '進入 Portal → 設定 → Channel API',
-        '建立 API Key 和 API Secret，填入下方',
+        '1. Log in to https://eclawbot.com',
+        '2. Go to Portal → Settings → Channel API',
+        '3. Create an API Key and API Secret',
+        '4. Enter the credentials below',
       ].join('\n'),
-      'E-Claw 設定說明',
+      'E-Claw Setup',
     );
 
     const apiKey = await prompter.text({
       message: 'Channel API Key',
       placeholder: 'eck_...',
       initialValue: resolved.apiKey || '',
-      validate: (v: string) => (String(v ?? '').trim() ? undefined : '必填'),
+      validate: (v: string) => (String(v ?? '').trim() ? undefined : 'Required'),
     });
 
     const apiSecret = await prompter.text({
       message: 'Channel API Secret',
       placeholder: 'ecs_...',
       initialValue: resolved.apiSecret || '',
-      validate: (v: string) => (String(v ?? '').trim() ? undefined : '必填'),
+      validate: (v: string) => (String(v ?? '').trim() ? undefined : 'Required'),
     });
 
     const entityIdStr = await prompter.text({
@@ -55,12 +56,12 @@ export const eclawOnboardingAdapter = {
       initialValue: String(resolved.entityId ?? 0),
       validate: (v: string) => {
         const n = Number(v);
-        return Number.isInteger(n) && n >= 0 && n <= 3 ? undefined : '請輸入 0–3';
+        return Number.isInteger(n) && n >= 0 && n <= 3 ? undefined : 'Must be 0–3';
       },
     });
 
     const botName = await prompter.text({
-      message: 'Bot 顯示名稱（選填）',
+      message: 'Bot display name (optional)',
       placeholder: 'My Bot',
       initialValue: resolved.botName ?? '',
     });
