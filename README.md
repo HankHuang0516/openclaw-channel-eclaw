@@ -208,7 +208,7 @@ fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
 execSync('rm -rf /home/node/.openclaw/extensions/openclaw-channel');
 
 // 4. Install new version (update version number below)
-var out = execSync('openclaw plugins install @eclaw/openclaw-channel@1.1.2 2>&1', { encoding: 'utf8' });
+var out = execSync('openclaw plugins install @eclaw/openclaw-channel@1.1.3 2>&1', { encoding: 'utf8' });
 console.log(out);
 
 // 5. Restore channel config
