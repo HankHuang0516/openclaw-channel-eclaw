@@ -150,6 +150,95 @@ Device owners can schedule messages to be sent to your bot at a specific time (o
 | `ECLAW_WEBHOOK_URL` | Production | Public URL for receiving inbound messages |
 | `ECLAW_WEBHOOK_PORT` | Optional | Webhook server port (default: random) |
 
+## Troubleshooting
+
+### `Config invalid: channels.eclaw unknown channel id`
+
+**Cause**: OpenClaw validates the config before loading plugins. If `channels.eclaw` is already in the config but the plugin hasn't loaded yet (e.g. after upgrade), validation fails.
+
+**Fix**: Run this script in the Zeabur terminal, then do a **full container restart** from the Zeabur Dashboard (not SIGUSR1 in-process restart):
+
+```bash
+cat > /tmp/fix-cfg.js << 'EOF'
+var fs = require('fs');
+var p = '/home/node/.openclaw/openclaw.json';
+var cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
+if (cfg.plugins && cfg.plugins.installs) {
+  delete cfg.plugins.installs['openclaw-channel'];
+}
+if (cfg.plugins && cfg.plugins.entries) {
+  delete cfg.plugins.entries['openclaw-channel'];
+}
+cfg.plugins = cfg.plugins || {};
+cfg.plugins.allow = cfg.plugins.allow || [];
+if (!cfg.plugins.allow.includes('openclaw-channel')) {
+  cfg.plugins.allow.push('openclaw-channel');
+}
+fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+console.log('Done:', JSON.stringify(cfg.plugins, null, 2));
+EOF
+node /tmp/fix-cfg.js
+```
+
+---
+
+### `plugin already exists: delete it first` (on upgrade)
+
+Running `openclaw plugins install @eclaw/openclaw-channel@X.Y.Z` directly fails when an older version is present. Use this full upgrade script instead:
+
+```bash
+cat > /tmp/upgrade-eclaw.js << 'EOF'
+var fs = require('fs'), { execSync } = require('child_process');
+var p = '/home/node/.openclaw/openclaw.json';
+var cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
+
+// 1. Save eclaw channel config
+var saved = cfg.channels && cfg.channels.eclaw;
+
+// 2. Strip entries that cause validation to fail
+if (cfg.channels) delete cfg.channels.eclaw;
+if (cfg.plugins) {
+  if (cfg.plugins.entries)  delete cfg.plugins.entries['openclaw-channel'];
+  if (cfg.plugins.allow)    cfg.plugins.allow = cfg.plugins.allow.filter(x => x !== 'openclaw-channel');
+  if (cfg.plugins.installs) delete cfg.plugins.installs['openclaw-channel'];
+}
+fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+
+// 3. Remove old plugin files
+execSync('rm -rf /home/node/.openclaw/extensions/openclaw-channel');
+
+// 4. Install new version (update version number below)
+var out = execSync('openclaw plugins install @eclaw/openclaw-channel@1.0.18 2>&1', { encoding: 'utf8' });
+console.log(out);
+
+// 5. Restore channel config
+cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
+if (saved) { cfg.channels = cfg.channels || {}; cfg.channels.eclaw = saved; }
+cfg.plugins.allow = cfg.plugins.allow || [];
+if (!cfg.plugins.allow.includes('openclaw-channel')) cfg.plugins.allow.push('openclaw-channel');
+fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+console.log('Done — restart the service from Zeabur Dashboard.');
+EOF
+node /tmp/upgrade-eclaw.js
+```
+
+After the script completes, do a **full service restart** from Zeabur Dashboard.
+
+---
+
+### In-process restart (`SIGUSR1`) doesn't apply channel config changes
+
+In-process restart validates the config before loading plugins, so `channels.eclaw` appears as an unknown channel and the restart fails. Always use a **full container restart** from the Zeabur Dashboard when changing channel or plugin configuration.
+
+---
+
+### Bot doesn't receive messages / webhook not called
+
+1. Check `ECLAW_WEBHOOK_URL` is a publicly reachable URL (not `localhost`)
+2. Verify the callback was registered: the plugin logs `Account default ready!` on startup
+3. In E-Claw Portal, confirm the entity shows as channel-bound (green dot)
+4. Check server logs: `curl "https://eclawbot.com/api/logs?deviceId=...&deviceSecret=...&limit=20"`
+
 ## License
 
 MIT
