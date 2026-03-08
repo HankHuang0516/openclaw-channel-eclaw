@@ -208,7 +208,7 @@ fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
 execSync('rm -rf /home/node/.openclaw/extensions/openclaw-channel');
 
 // 4. Install new version (update version number below)
-var out = execSync('openclaw plugins install @eclaw/openclaw-channel@1.0.18 2>&1', { encoding: 'utf8' });
+var out = execSync('openclaw plugins install @eclaw/openclaw-channel@1.1.2 2>&1', { encoding: 'utf8' });
 console.log(out);
 
 // 5. Restore channel config
@@ -238,6 +238,28 @@ In-process restart validates the config before loading plugins, so `channels.ecl
 2. Verify the callback was registered: the plugin logs `Account default ready!` on startup
 3. In E-Claw Portal, confirm the entity shows as channel-bound (green dot)
 4. Check server logs: `curl "https://eclawbot.com/api/logs?deviceId=...&deviceSecret=...&limit=20"`
+
+## Major Fix History
+
+A record of critical bug fixes, when they occurred, the problem, and the countermeasure.
+
+---
+
+### 2026-03-08 — v1.1.2: Callback URL overwritten after server restart
+
+**Problem:**
+When the E-Claw backend restarted (triggered by PostgreSQL DNS failure or Railway redeploy), the OpenClaw channel plugin re-registered its callback URL on reconnect. If `ECLAW_WEBHOOK_URL` or `account.webhookUrl` was misconfigured (e.g. `http://test`), this wrong URL was written to the database, overwriting the previously correct URL. The bot then stopped receiving messages silently — no error, no alert.
+
+**Root cause:**
+- `POST /api/channel/register` in the backend had no URL validation (no format check, no localhost rejection, no placeholder detection, no handshake test)
+- The plugin re-registers unconditionally on every startup with whatever URL it has configured
+
+**Countermeasure:**
+- Validate `ECLAW_WEBHOOK_URL` / `webhookUrl` before starting: ensure it is a reachable HTTPS URL (not `localhost`, not `http://test`, not empty)
+- If URL is invalid, log a clear error and refuse to register rather than writing a broken URL to the database
+- Users should verify `ECLAW_WEBHOOK_URL` is set to their OpenClaw's public URL in Zeabur environment variables
+
+---
 
 ## License
 
