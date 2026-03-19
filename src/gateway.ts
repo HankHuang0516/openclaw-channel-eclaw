@@ -94,6 +94,12 @@ export async function startAccount(ctx: any): Promise<void> {
     const regData = await client.registerCallback(callbackUrl, callbackToken);
     console.log(`[E-Claw] Registered with E-Claw. Device: ${regData.deviceId}, Entities: ${regData.entities.length}`);
 
+    // Debug: log entity slot status and configured entityId
+    console.log(`[E-Claw] Configured entityId: ${account.entityId === undefined ? 'undefined (auto-select)' : account.entityId}`);
+    for (const e of regData.entities) {
+      console.log(`[E-Claw]   slot ${e.entityId}: ${e.character}${e.name ? ` "${e.name}"` : ''} bound=${e.isBound} bindingType=${e.bindingType ?? 'none'}`);
+    }
+
     // Bind entity via channel API.
     // /api/channel/bind is idempotent for the same channel account:
     //   - Not bound → binds fresh, returns new botSecret
@@ -104,25 +110,30 @@ export async function startAccount(ctx: any): Promise<void> {
     // fall back to other free slots from the register response.
     let bindData: Awaited<ReturnType<EClawClient['bindEntity']>>;
     try {
+      console.log(`[E-Claw] Attempting bindEntity(${account.entityId === undefined ? 'auto' : account.entityId})...`);
       bindData = await client.bindEntity(account.entityId, account.botName);
     } catch (initialErr) {
+      const errMsg = initialErr instanceof Error ? initialErr.message : String(initialErr);
+      console.warn(`[E-Claw] Initial bind failed: ${errMsg}`);
+
       // Find unbound slots (excluding the one that just failed) and retry each
       const failedId = account.entityId;
       const freeSlots = regData.entities
         .filter(e => !e.isBound && e.entityId !== failedId)
         .map(e => e.entityId);
+      console.log(`[E-Claw] Free slots for retry: [${freeSlots.join(', ')}]`);
 
       let lastErr = initialErr;
       let bound = false;
       for (const slotId of freeSlots) {
         try {
-          console.log(
-            `[E-Claw] Bind failed${failedId !== undefined ? ` for slot ${failedId}` : ''}, trying entity slot ${slotId}...`
-          );
+          console.log(`[E-Claw] Retrying bindEntity(${slotId})...`);
           bindData = await client.bindEntity(slotId, account.botName);
           bound = true;
           break;
         } catch (retryErr) {
+          const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          console.warn(`[E-Claw] Slot ${slotId} also failed: ${retryMsg}`);
           lastErr = retryErr;
         }
       }
