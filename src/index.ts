@@ -15,7 +15,6 @@ import { dispatchWebhook } from './webhook-registry.js';
  *         default:
  *           apiKey: "eck_..."
  *           apiBase: "https://eclawbot.com"
- *           entityId: 0
  *           botName: "My Bot"
  *           webhookUrl: "https://your-openclaw-domain.com"
  *

@@ -16,7 +16,6 @@
             "apiKey": { "type": "string", "description": "Channel API Key (eck_...)" },
             "apiSecret": { "type": "string", "description": "Channel API Secret (ecs_...)" },
             "apiBase": { "type": "string", "default": "https://eclawbot.com" },
-            "entityId": { "type": "number", "minimum": 0, "maximum": 7, "description": "Optional: entity slot to use (0-7). If omitted, auto-assigned to first free slot." },
             "botName": { "type": "string", "maxLength": 20 }
           },
           "required": ["apiKey", "apiSecret"]
