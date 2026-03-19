@@ -20,7 +20,6 @@ export class EClawClient {
   constructor(config: EClawAccountConfig) {
     this.apiBase = config.apiBase;
     this.apiKey = config.apiKey;
-    this.entityId = config.entityId;  // undefined until assigned by bindEntity
   }
 
   /** Register callback URL with E-Claw backend */
