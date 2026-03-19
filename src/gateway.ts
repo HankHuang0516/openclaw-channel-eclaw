@@ -99,15 +99,48 @@ export async function startAccount(ctx: any): Promise<void> {
     //   - Not bound → binds fresh, returns new botSecret
     //   - Already bound via this channel account → returns existing botSecret (reconnect)
     //   - Bound via different method → throws error (user must unbind first)
-    // entityId is omitted here so the server auto-selects the best slot
-    const bindData = await client.bindEntity(account.entityId, account.botName);
-    const assignedEntityId = bindData.entityId;
+    //
+    // When entityId is not specified, the backend auto-selects a slot.
+    // If auto-selected slot is bound via a different method, we retry with
+    // other free slots from the register response.
+    let bindData: Awaited<ReturnType<EClawClient['bindEntity']>>;
+    if (account.entityId !== undefined) {
+      // User explicitly requested a specific slot — no fallback
+      bindData = await client.bindEntity(account.entityId, account.botName);
+    } else {
+      // Auto-select: try without entityId first, then fallback to free slots
+      try {
+        bindData = await client.bindEntity(undefined, account.botName);
+      } catch (autoErr) {
+        // Find unbound slots from register response and retry each
+        const freeSlots = regData.entities
+          .filter(e => !e.isBound)
+          .map(e => e.entityId);
+
+        let lastErr = autoErr;
+        let bound = false;
+        for (const slotId of freeSlots) {
+          try {
+            console.log(`[E-Claw] Auto-select failed, trying entity slot ${slotId}...`);
+            bindData = await client.bindEntity(slotId, account.botName);
+            bound = true;
+            break;
+          } catch (retryErr) {
+            lastErr = retryErr;
+          }
+        }
+        if (!bound) {
+          throw lastErr;
+        }
+      }
+    }
+    const assignedEntityId = bindData!.entityId;
     const entityInfo = regData.entities.find(e => e.entityId === assignedEntityId);
     const wasAlreadyBound = entityInfo?.isBound ?? false;
     console.log(
       wasAlreadyBound
-        ? `[E-Claw] Entity ${assignedEntityId} reconnected (existing channel binding), publicCode: ${bindData.publicCode}`
-        : `[E-Claw] Entity ${assignedEntityId} bound, publicCode: ${bindData.publicCode}`
+        ? `[E-Claw] Entity ${assignedEntityId} reconnected (existing channel binding), publicCode: ${bindData!.publicCode}`
+        : `[E-Claw] Entity ${assignedEntityId} bound, publicCode: ${bindData!.publicCode}`
     );
 
     console.log(`[E-Claw] Account ${accountId} ready!`);
