@@ -38,20 +38,32 @@ export function unregisterWebhookToken(callbackToken: string): void {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function dispatchWebhook(req: any, res: any): Promise<void> {
   const authHeader = req.headers?.authorization as string | undefined;
-  if (!authHeader?.startsWith('Bearer ')) {
+
+  // Try Bearer-token routing first (preferred)
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const entry = registry.get(token);
+    if (entry) {
+      await entry.handler(req, res);
+      return;
+    }
+    // Token present but unknown — fall through to single-handler fallback
+  }
+
+  // Fallback: if exactly one handler is registered, route to it.
+  // This handles E-Claw backends that don't echo callback_token.
+  if (registry.size === 1) {
+    const [, entry] = [...registry.entries()][0];
+    await entry.handler(req, res);
+    return;
+  }
+
+  // No valid routing possible
+  if (registry.size === 0) {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'No handlers registered' }));
+  } else {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
-    return;
   }
-
-  const token = authHeader.slice(7);
-  const entry = registry.get(token);
-  if (!entry) {
-    // Unknown token — likely a stale push after a server restart
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Unknown token' }));
-    return;
-  }
-
-  await entry.handler(req, res);
 }
