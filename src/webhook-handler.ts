@@ -36,6 +36,16 @@ export function createWebhookHandler(
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
 
+    // Guard: reject messages missing sender identity to avoid creating
+    // broken sessions with key "undefined:undefined"
+    if (!msg.deviceId || msg.entityId === undefined || msg.entityId === null) {
+      console.warn(
+        `[E-Claw] Rejected webhook: missing deviceId or entityId ` +
+        `(deviceId=${msg.deviceId}, entityId=${msg.entityId})`
+      );
+      return;
+    }
+
     // Dispatch to OpenClaw agent
     try {
       const rt = getPluginRuntime();
