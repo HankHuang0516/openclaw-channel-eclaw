@@ -18,7 +18,7 @@
             "apiBase": { "type": "string", "default": "https://eclawbot.com" },
             "botName": { "type": "string", "maxLength": 20 }
           },
-          "required": ["apiKey", "apiSecret"]
+          "required": ["apiKey"]
         }
       }
     }

@@ -33,7 +33,7 @@ channels:
     accounts:
       default:
         apiKey: "eck_..."       # From E-Claw Portal → Settings → Channel API
-        apiSecret: "ecs_..."    # From E-Claw Portal → Settings → Channel API
+        apiSecret: "ecs_..."    # (Optional) From E-Claw Portal → Settings → Channel API
         apiBase: "https://eclawbot.com"
         entityId: 0             # Entity slot (0-3 free tier, 0-7 premium). Omit to auto-assign.
         botName: "My Bot"       # Display name in E-Claw (max 20 chars)
@@ -43,7 +43,7 @@ channels:
 
 1. Log in to [E-Claw Portal](https://eclawbot.com/portal)
 2. Go to **Settings → Channel API**
-3. Copy your `API Key` (`eck_...`) and `API Secret` (`ecs_...`)
+3. Copy your `API Key` (`eck_...`) and optionally `API Secret` (`ecs_...`)
 
 ## How It Works
 
@@ -54,7 +54,7 @@ OpenClaw Agent ──replies──▶ POST /api/channel/message ──▶ User (
 
 - **Inbound**: E-Claw POSTs structured JSON to a webhook URL registered by this plugin
 - **Outbound**: Plugin calls `POST /api/channel/message` with the bot reply
-- **Auth**: `eck_`/`ecs_` channel credentials for API auth, per-entity `botSecret` for message auth
+- **Auth**: `eck_` channel API key (required) + optional `ecs_` secret for API auth, per-entity `botSecret` for message auth
 
 ## Inbound Message Structure
 
