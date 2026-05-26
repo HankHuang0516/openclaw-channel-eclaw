@@ -50,6 +50,15 @@ export function createWebhookHandler(
     try {
       const rt = getPluginRuntime();
       const client = getClient(accountId);
+
+      const directAck = String(msg.text || '').match(/^ECLAW_HEALTHCHECK\s+([A-Za-z0-9]+)\b/m);
+      if (directAck) {
+        if (client) {
+          await client.sendMessage(`ACK ${directAck[1]}`, 'IDLE');
+        }
+        return;
+      }
+
       const conversationId = msg.conversationId || `${msg.deviceId}:${msg.entityId}`;
 
       // Capture event context for deliver routing

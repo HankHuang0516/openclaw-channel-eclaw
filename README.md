@@ -272,6 +272,20 @@ When the E-Claw backend restarted (triggered by PostgreSQL DNS failure or Railwa
 - If URL is invalid, log a clear error and refuse to register rather than writing a broken URL to the database
 - Users should verify `ECLAW_WEBHOOK_URL` is set to their OpenClaw's public URL in Zeabur environment variables
 
+### 2026-05-26 - v1.3.2: Healthcheck ACKs bypass long-running agent work
+
+**Problem:**
+Fleet monitors send `ECLAW_HEALTHCHECK <nonce>` through the same browser/API
+message path as normal user chat. If the OpenClaw agent is busy with tool-heavy
+work, the monitor can time out even though the E-Claw channel transport is
+healthy.
+
+**Countermeasure:**
+- The webhook detects `ECLAW_HEALTHCHECK <nonce>` before dispatching to the
+  OpenClaw agent and replies through E-Claw with `ACK <nonce>`.
+- Model-health checks should still go through the agent when the goal is to
+  validate model/reasoning policy instead of transport reachability.
+
 ---
 
 ## License
